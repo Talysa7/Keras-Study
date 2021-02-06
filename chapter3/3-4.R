@@ -22,8 +22,8 @@ str(train_labels[[1]])
 # 희박하게 나오는 단어를 제외해 처리 용량에 맞춰 벡터 데이터 구성 가능
 # sapply는 주어진 벡터나 배열과 같은 길이의 리스트를 반환
 # 9999개로 1만 개를 넘지 않음
-?sapply
-max(sapply(train_data, max))
+# ?sapply
+# max(sapply(train_data, max))
 
 # 감상평 중 하나를 영어 단어로 빠르게 복호화하는 예제
 # word_index는 단어를 정수 인덱스에 사상하는 이름이 부여된 리스트
@@ -74,3 +74,74 @@ y_test <- as.numeric(test_labels)
 str(train_labels[1])
 str(y_train[1])
 
+# 3.4.3 망 구축
+# 모델 정의하기
+# 3개 계층의 망, 첫 번째와 두 번째는 ReLU를 통해 음수인 값을 0으로, 세 번째는 Sigmoid를 통해 구간을 0, 1로 축소
+model <- keras_model_sequential() %>%
+    layer_dense(units = 16, activation = "relu", input_shape = c(10000)) %>%
+    layer_dense(units = 16, activation = "relu") %>%
+    layer_dense(units = 1, activation = "sigmoid")
+
+# 모델 컴파일
+# 최적화기로 rmsprop, 손실 함수로 binary_crossentrophy, 계량 함수에는 accuracy 적용
+# 교차 엔트로피는 정보 이론 분야에서 확률 분포 사이의 거리를 측정하는 양, 확률 산출 모델을 다룰 때 좋음
+# 참고: https://onesixx.com/optimizer-loss-metrics/
+model %>% compile(
+    optimizer = "rmsprop",
+    loss = "binary_crossentropy",
+    metrics = c("accuracy")
+)
+
+# 최적화기의 파라미터를 구성하거나 사용자 정의 손실 함수를 전달하려면 인수를 사용
+# 최적화기 구성하기 예제, optimizer_rmsprop 함수에 lr 값 지정, lr 값은 학습률(Learning rate)
+# ? optimizer_rmsprop()
+# model %>% compile(
+#    optimizer <- optimizer_rmsprop(lr=0.001),
+#    loss <- "binary_crossentrophy",
+#    metrics <- c("accuracy")
+#)
+
+# 3.4.4 접근 방식 검증하기
+# 새로운 데이터에 대한 모델 정확도를 훈련 중에 관측하기 위해 표본을 설정해 검증 집합 작성
+val_indices <- 1:10000
+
+x_val <- x_train[val_indices,]
+partial_x_train <- x_train[-val_indices,]
+
+y_val <- y_train[val_indices]
+partial_y_train <- y_train[-val_indices]
+
+# 512개 표본으로 구성된 미니 배치로 모든 표본을 대상으로 20회 반복해 모델 학습(20에포크)
+# 설정한 1만 개 표본에서 손실 및 정확도 관측하기
+# history 객체는 모델과 각 계량 데이터를 저장하는 데 사용되는 파라미터를 포함함
+history <- model %>% fit(
+    partial_x_train,
+    partial_y_train,
+    epochs = 20,
+    batch_size = 512,
+    validation_data = list(x_val, y_val)
+)
+
+# 훈련 계량 및 검증 계량 시각화
+# 훈련 손실은 모든 에포크마다 줄어들고, 훈련의 정확도는 증가
+plot(history)
+
+# 과적합을 방지하기 위해 훈련 중단하기
+# 성능 및 효율이 좋아보이는 에포크까지만 훈련시켜 결과 확인해보기
+model <- keras_model_sequential() %>%
+    layer_dense(units = 16, activation = "relu", input_shape = c(10000)) %>%
+    layer_dense(units = 16, activation = "relu") %>%
+    layer_dense(units = 1, activation = "sigmoid"
+)
+
+model %>% compile(
+    optimizer = "rmsprop",
+    loss = "binary_crossentropy",
+    metrics = c("accuracy")
+)
+
+model %>% fit(x_train, y_train, epochs = 4, batch_size = 512)
+results <- model %>% evaluate(x_test, y_test)
+
+# 결과 확인하기, 정확도 약 88%
+results
