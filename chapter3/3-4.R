@@ -83,7 +83,7 @@ model <- keras_model_sequential() %>%
     layer_dense(units = 1, activation = "sigmoid")
 
 # 모델 컴파일
-# 최적화기로 rmsprop, 손실 함수로 binary_crossentrophy, 계량 함수에는 accuracy 적용
+# 최적화기로 rmsprop, 손실 함수로 binary_crossentropy, 계량 함수에는 accuracy 적용
 # 교차 엔트로피는 정보 이론 분야에서 확률 분포 사이의 거리를 측정하는 양, 확률 산출 모델을 다룰 때 좋음
 # 참고: https://onesixx.com/optimizer-loss-metrics/
 model %>% compile(
@@ -97,7 +97,7 @@ model %>% compile(
 # ? optimizer_rmsprop()
 # model %>% compile(
 #    optimizer <- optimizer_rmsprop(lr=0.001),
-#    loss <- "binary_crossentrophy",
+#    loss <- "binary_crossentropy",
 #    metrics <- c("accuracy")
 #)
 
@@ -145,3 +145,136 @@ results <- model %>% evaluate(x_test, y_test)
 
 # 결과 확인하기, 정확도 약 88%
 results
+
+# 3.4.5 훈련된 망을 사용해 신규 데이터에 대한 예측 생성하기
+# predict()로 긍정적인 감상평일 가능성 보기
+# 1에 가까울수록 긍정적인 감상평일 가능성이 높음
+model %>% predict(x_test[1:10,])
+
+# 3.4.6 추가 실험
+
+# 은닉 계층 수를 1개 또는 3개 사용해 정확도에 미치는 영향 보기
+# 은닉 계층 수 1개인 경우, 활성 함수 동일하게 ReLU, 에포크 동일하게 30으로 확인해보기
+model <- keras_model_sequential() %>%
+    layer_dense(units = 16, activation = "relu", input_shape = c(10000)) %>%
+    layer_dense(units = 1, activation = "sigmoid"
+)
+
+model %>% compile(
+    optimizer = "rmsprop",
+    loss = "binary_crossentropy",
+    metrics = c("accuracy")
+)
+
+model %>% fit(x_train, y_train, epochs = 30, batch_size = 512)
+
+# 은닉 계층 1개인 경우의 결과 확인, 정확도가 84%로 더 낮음, 손실은 0.77로 더 높음, 소요 시간 더 짧음
+results <- model %>% evaluate(x_test, y_test)
+results
+
+# 은닉 계층 수가 3개인 경우, 활성 함수 동일하게 ReLU, 에포크 동일하게 30
+model <- keras_model_sequential() %>%
+    layer_dense(units = 16, activation = "relu", input_shape = c(10000)) %>%
+    layer_dense(units = 16, activation = "relu") %>%
+    layer_dense(units = 16, activation = "relu") %>%
+    layer_dense(units = 1, activation = "sigmoid"
+)
+
+model %>% compile(
+    optimizer = "rmsprop",
+    loss = "binary_crossentropy",
+    metrics = c("accuracy")
+)
+
+model %>% fit(x_train, y_train, epochs = 30, batch_size = 512)
+
+# 은닉 계층 3개인 경우의 결과 확인, 정확도가 84%로 더 낮음, 손실은 1.49로 더 높음, 소요시간 더 짧음
+results <- model %>% evaluate(x_test, y_test)
+results
+
+# 은닉 유닛 수를 다르게 하여 확인해보기
+# 은닉 유닛 수 32, 은닉 계층 2개, 에포크 30
+model <- keras_model_sequential() %>%
+    layer_dense(units = 32, activation = "relu", input_shape = c(10000)) %>%
+    layer_dense(units = 32, activation = "relu") %>%
+    layer_dense(units = 1, activation = "sigmoid"
+)
+
+model %>% compile(
+    optimizer = "rmsprop",
+    loss = "binary_crossentropy",
+    metrics = c("accuracy")
+)
+
+model %>% fit(x_train, y_train, epochs = 30, batch_size = 512)
+
+# 은닉 유닛 32개인 경우 결과 확인, 정확도 85%로 더 낮음, 손실 1.29로 더 큼, 시간 약간 더 적게 걸림
+results <- model %>% evaluate(x_test, y_test)
+results
+
+# 은닉 유닛 수 64개
+model <- keras_model_sequential() %>%
+    layer_dense(units = 64, activation = "relu", input_shape = c(10000)) %>%
+    layer_dense(units = 64, activation = "relu") %>%
+    layer_dense(units = 1, activation = "sigmoid"
+)
+
+model %>% compile(
+    optimizer = "rmsprop",
+    loss = "binary_crossentropy",
+    metrics = c("accuracy")
+)
+
+model %>% fit(x_train, y_train, epochs = 30, batch_size = 512)
+
+# 은닉 유닛 64개인 경우 결과 확인 정확도 85%로 더 낮음, 손실 1.29로 더 큼, 시간 더 오래 걸림
+results <- model %>% evaluate(x_test, y_test)
+results
+
+# 은닉 유닛 수, 은닉 계층 수를 적절히 조절하는 게 성능과 정확도 측면에서 더 유익
+# 정확도도 중요하지만 손실 측면에서도 추가 실험한 경우들은 유익하지 않았음
+
+# 손실 함수를 binary_crossentropy에서 mse로 변경해보기
+# binary_crossentropy는 확률 형태의 예측 결과를 다룰 때 좋음
+# mse는 평균 제곱 오차(Mean Squared Error)로 모델의 출력 값과 원하는 출력 값 사이의 거리를 오차로 사용, 계산이 간편
+model <- keras_model_sequential() %>%
+    layer_dense(units = 16, activation = "relu", input_shape = c(10000)) %>%
+    layer_dense(units = 16, activation = "relu") %>%
+    layer_dense(units = 1, activation = "sigmoid"
+)
+
+model %>% compile(
+    optimizer = "rmsprop",
+    loss = "mse",
+    metrics = c("accuracy")
+)
+
+model %>% fit(x_train, y_train, epochs = 30, batch_size = 512)
+
+# 손실 함수를 mse로 한 경우 결과 확인, 정확도는 85%로 더 낮지만 손실이 0.13으로 크게 줄어들었음, 시간은 비슷하게 걸림
+results <- model %>% evaluate(x_test, y_test)
+results
+
+# 활성 함수를 ReLU가 아닌 Tanh 사용해보기
+# Tanh는 Sigmoid와 유사하지만 출력 값의 평균이 0
+# 참고: https://ganghee-lee.tistory.com/32
+model <- keras_model_sequential() %>%
+    layer_dense(units = 16, activation = "tanh", input_shape = c(10000)) %>%
+    layer_dense(units = 16, activation = "tahn") %>%
+    layer_dense(units = 1, activation = "sigmoid"
+)
+
+model %>% compile(
+    optimizer = "rmsprop",
+    loss = "binary_crossentropy",
+    metrics = c("accuracy")
+)
+
+model %>% fit(x_train, y_train, epochs = 30, batch_size = 512)
+
+# 활성 함수로 tanh를 사용한 경우 결과 확인, 정확도는 83%, 손실은 0.99로 더 나쁜 결과, 시간은 약간 적게 걸림
+results <- model %>% evaluate(x_test, y_test)
+results
+
+# 에포크가 반복될수록 지나치게 높은 정확도(Accuracy)를 보이며 모델이 과적합되기도 함
+# 은닉 계층 및 유닛, 활성 함수, 손실 함수를 어떻게 설정하는지에 따라 결과와 효율이 달라짐
