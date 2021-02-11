@@ -2,9 +2,9 @@
 # 이해하기 좀 어려웠다...
 
 # 정리정돈
-path <- "C:/study/lecture/keras-study"
-setwd(path)
 rm(list=ls())
+path <- "C:/study/lecture/arbeit/keras-study"
+setwd(path)
 
 # 계층을 서로 쌓아 망을 구축하는 예제에서, 계층의 사례
 # 2D 텐서를 입력 받아 다른 2D 텐서를 반환하는 함수

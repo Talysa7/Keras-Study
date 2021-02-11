@@ -1,9 +1,9 @@
 # 2.1 신경망 둘러보기
 
 # 정리정돈
-path <- "C:/study/lecture/keras-study"
-setwd(path)
 rm(list=ls())
+path <- "C:/study/lecture/arbeit/keras-study"
+setwd(path)
 
 # Keras 설치
 install.packages("keras")

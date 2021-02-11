@@ -2,9 +2,9 @@
 # IMDB 데이터셋 사용
 
 # 정리정돈
-path <- "C:/study/lecture/keras-study"
-setwd(path)
 rm(list=ls())
+path <- "C:/study/lecture/arbeit/keras-study"
+setwd(path)
 
 # 3.4.1 데이터셋 적재
 # %<-% 다중 할당 연산자 사용
