@@ -97,3 +97,44 @@ model %>% compile(
     metrics = c("acc")
 )
 
+# 5.2.4 데이터 전처리
+# 그림 파일 읽기 -> RGB 격자로 부호화 -> 텐서로 변환 -> 0~1 구간 값으로 재조정
+# 케라스에서 제공하는 image_data_generator() 사용
+train_datagen <- image_data_generator(rescale = 1/255) # 0~1 구간 값으로 조정
+validation_datagen <- image_data_generator(rescale = 1/255)
+
+train_generator <- flow_images_from_directory(
+    train_dir,
+    train_datagen,
+    target_size = c(150, 150),
+    batch_size = 20,
+    class_mode = "binary"
+)
+
+validation_generator <- flow_images_from_directory(
+    validation_dir,
+    validation_datagen,
+    target_size = c(150, 150),
+    batch_size = 20,
+    class_mode = "binary"
+)
+
+# 생성기를 사용해 모델에 데이터 적합시키기
+# fit_generator 함수 사용, steps_per_epoch 인수에 가져올 표본 수 전달
+history <- model %>% fit_generator(
+    train_generator,
+    steps_per_epoch = 100,
+    epochs = 30,
+    validation_data = validation_generator,
+    validation_steps = 50
+)
+
+# 모델 저장하기
+model %>% save_model_hdf5("cats_and_dogs_small_1.h5")
+
+# 훈련 중 손실 및 정확도 곡선 표시하기
+plot(history)
+
+# 훈련 표본이 적어 과적합 우려
+# 드롭아웃, 가중치 감소 등 활용한 과적합 완화 필요
+
