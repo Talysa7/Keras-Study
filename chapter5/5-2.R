@@ -138,3 +138,92 @@ plot(history)
 # 훈련 표본이 적어 과적합 우려
 # 드롭아웃, 가중치 감소 등 활용한 과적합 완화 필요
 
+# image_data_generator를 통한 데이터 보강 설정 구성하기 예제
+datagen <- image_data_generator(
+    rescale = 1/255,
+    rotation_range = 40, # 각도 단위 값, 그림을 임의로 회전
+    width_shift_range = 0.2, # 그림을 가로 또는 세로로 임의 변환하는 범위
+    height_shift_range = 0.2,
+    shear_range = 0.2, # 임의로 가위질 변환 적용
+    zoom_range = 0.2, # 그림을 무작위로 확대
+    horizontal_flip = TRUE, # 수평 비대칭을 가정하지 않은 경우, 관련 이미지의 절반을 무작위 반전
+    fill_mode = "nearest" # 새로 생성된 픽셀을 채우는 방법
+)
+
+# 어떤 식으로 이미지가 보강되는지 확인
+fnames <- list.files(train_cats_dir, full.names = TRUE)
+img_path <- fnames[[3]] # 이미지 하나 선택
+
+img <- image_load(img_path, target_size = c(150, 150)) # 이미지 읽어 크기 조정
+img_array <- image_to_array(img) # 이미지를 (150, 150, 3) 배열로 변환
+img_array <- array_reshape(img_array, c(1, 150, 150, 3)) # 배열을 (1, 150, 150, 3)으로 변경
+
+augmentation_generator <- flow_images_from_data(
+    img_array,
+    generator = datagen,
+    batch_size = 1
+)
+
+op <- par(mfrow = c(2, 2), pty = "s", mar = c(1, 0, 1, 0))
+for (i in 1:4) {
+    atch <- generator_next(augmentation_generator)
+    plot(as.raster(batch[1,,,]))
+}
+
+par(op)
+
+# 위와 같은 데이터 보강 구성을 사용해 새 망을 훈련하면 망에 동일한 입력이 두 번 표시되지 않음
+# 새로운 정보는 생성할 수 없고, 기존 정보를 다시 섞어 쓰는 것, 과적합을 없애기에 충분치 않음
+# 과적합에 더 대응하려면 분류기 바로 앞 모델에 드롭아웃 계층 추가
+
+# 드롭아웃을 포함하는 새로운 합성망 정의하기
+model <- keras_model_sequential() %>%
+    layer_conv_2d(filters = 32, kernel_size = c(3, 3), activation = "relu", input_shape = c(150, 150, 3)) %>%
+    layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+    layer_conv_2d(filters = 64, kernel_size = c(3, 3), activation = "relu") %>%
+    layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+    layer_conv_2d(filters = 128, kernel_size = c(3, 3), activation = "relu") %>%
+    layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+    layer_conv_2d(filters = 128, kernel_size = c(3, 3), activation = "relu") %>%
+    layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+    layer_flatten() %>%
+    layer_dropout(rate = 0.5) %>%
+    layer_dense(units = 512, activation = "relu") %>%
+    layer_dense(units = 1, activation = "sigmoid")
+
+model %>% compile(
+    loss = "binary_crossentropy",
+    optimizer = optimizer_rmsprop(lr = 1e-4),
+    metrics = c("acc")
+)
+
+# 새로운 망으로 합성망 훈련하기
+test_datagen <- image_data_generator(rescale = 1/255)
+train_datagen <- flow_images_from_directory(
+    train_dir,
+    datagen,
+    target_size = c(150, 150),
+    batch_size = 32,
+    class_mode = "binary"
+)
+validation_datagen <- flow_images_from_directory(
+    validation_dir,
+    test_datagen,
+    target_size = c(150, 150),
+    batch_size = 32,
+    class_mode = "binary"
+)
+
+history <- model %>% fit_generator(
+    train_generator,
+    steps_per_epoch = 100,
+    epochs = 100,
+    validation_data = validation_generator,
+    validation_steps = 50
+)
+
+model %>% save_model_hdf5("cats_and_dogs_small_2.h5")
+
+# 데이터 보강 및 드롭아웃 후 과적합되지 않고 상대적으로 향상된 정확도(82%)에 도달
+# 최대 87%까지 정확도를 높일 수 있지만, 더 높은 수준은 어려움
+# 사전 훈련 모델을 사용해 정확도를 더 높일 수 있음
