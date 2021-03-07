@@ -178,3 +178,43 @@ history <- model %>% fit_generator(
 
 # 결과 재확인, 정확도는 90%이지만 과적합 측면을 고려하면 첫 번째 방법보다 나음
 plot(history)
+
+# 5.3.2 미세 조정
+# 훈련된 기본 망 위에 맞춤 망 추가 -> 기본 망 동결 -> 추가한 부분 훈련 -> 기본 망 일부 동결 해제 -> 함께 훈련
+
+# 동결 해제
+unfreeze_weights(conv_base, from = "block3_conv1")
+
+# 미세 조정, RMSprop 최적화기로 학습 속도를 느리게 해 수정하는 정도를 제한
+model %>% compile(
+  loss = "binary_crossentropy",
+  optimizer = optimizer_rmsprop(lr = 1e-5),
+  metrics = c("accuracy")
+)
+
+# 오래 걸린다... 내 PC로는 한 에포크당 9분 남짓.
+history <- model %>% fit_generator(
+  train_generator,
+  steps_per_epoch= 100,
+  epochs = 100,
+  validation_data = validation_generator,
+  validation_steps = 50
+)
+
+# 결과 확인
+plot(history)
+
+# 테스트 데이터에서 최종 평가
+test_generator <- flow_images_from_directory(
+  test_dir,
+  test_datagen,
+  target_size = c(150, 150),
+  batch_size = 20,
+  class_mode = "binary"
+)
+
+# 손실, 정확도
+model %>% evaluate_generator(test_generator, steps = 50)
+
+# 모델 저장(오래 걸렸기 때문에 저장해둔다!)
+model %>% save_model_hdf5("cats_and_dogs_small_3")
