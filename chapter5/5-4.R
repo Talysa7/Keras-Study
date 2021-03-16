@@ -199,3 +199,98 @@ for (layer_name in c("block1_conv1", "block2_conv1", "block3_conv1", "block4_con
 # 이 시각화된 필터들은 합성망 계층이 세상을 보는 방법을 설명함
 # 합성망의 각 계층은 입력을 필터의 조합으로 표현할 수 있도록 필터 모음을 학습
 # 질감, 윤곽선, 색상 같은 것들이 부호화됨
+
+# 5.4.3 클래스 활성의 열 지도 시각화
+# 이미지의 어떤 부분이 특정 클래스를 활성화하는지?
+
+model <- application_vgg16(weights = "imagenet")
+
+# 위 모델은 224*224 크기의 이미지들로 훈련되었으므로, 사용하려는 이미지의 전처리 필요
+img_path <- "C:/study/lecture/arbeit/keras-study/chapter5/creative_commons_elephant.jpg"
+img <- image_load(img_path, target_size = c(224, 224)) %>%
+  image_to_array() %>%
+  array_reshape(dim = c(1, 224, 224, 3)) %>%
+  imagenet_preprocess_input()
+
+# 예측 벡터를 사람이 읽을 수 있도록 복호화
+# 아프리카 코끼리일 가능성의 점수가 높게 나왔음
+# 이 이미지를 통해 최대로 활성화된 에측 벡터의 항목은 인덱스 387번 아프리카 코끼리인 것
+preds <- model%>%predict(img)
+imagenet_decode_predictions(preds, top = 3)
+which.max(preds[1,])
+
+# 아프리카 코끼리와 같은 이미지 부분을 시각화하기 위한 Grad-CAM 과정 설정
+
+# 예측 벡터의 아프리카 코끼리 항목
+african_elephant_output <- model$output[,387]
+
+# 마지막 합성곱 계층인 "block5_conv3"의 출력 특징 지도
+last_conv_layer <- model %>% get_layer("block5_conv3")
+
+# 위 출력 특징 지도와 관련된 아프리카 코끼리 클래스의 경사
+grads <- k_gradients(african_elephant_output, last_conv_layer$output)[[1]]
+
+# 경사의 평균 강도
+pooled_grads <- k_mean(grads, axis = c(1, 2, 3))
+
+# 표본 이미지 한 장이 주어졌을 때, pooled_grads, block5_conv3 출력 특징 지도 출력
+iterate <- k_function(list(model$input), list(pooled_grads, last_conv_layer$output[1,,,]))
+
+# 두 코끼리의 견본 이미지가 주어졌을 때의 두 값
+c(pooled_grads_value, conv_layer_output_value) %<-% iterate(list(img))
+
+# 채널의 중요도를 각 채널에 곱하기
+for (i in 1:512) {
+  conv_layer_output_value[,,i] <- conv_layer_output_value[,,i] * pooled_grads_value[[i]]
+}
+
+# 클래스 활성화 열 지도
+heatmap <- apply(conv_layer_output_value, c(1, 2), mean)
+
+# 시각화를 위한 정규화
+heatmap <- pmax(heatmap, 0)
+heatmap <- heatmap/max(heatmap)
+
+write_heatmap <- function(heatmap, filename, width = 224, height = 224, bg = "white", col = terrain.colors(12)) {
+  png(filename, width = width, height = height, bg = bg)
+  op = par(mar = c(0, 0, 0, 0))
+  on.exit({par(op); dev.off()}, add = TRUE)
+  rotate <- function(x) t(apply(x, 2, rev))
+  image(rotate(heatmap), axes = FALSE, asp = 1, col = col)
+}
+
+# 파일 확인해보니 도대체 왜 이 부분으로 인해 아프리카 코끼리라는 결과가 도출되는지는 알 수 없다...
+write_heatmap(heatmap, "elephant_heatmap.png")
+
+# 원본 이미지를 방금 얻은 열지도와 겹쳐 놓은 이미지 생성해보기
+install.packages("magick")
+install.packages("viridis")
+library(magick)
+library(viridis)
+
+image <- image_read(img_path)
+info <- image_info(image)
+geometry <- sprintf("%dx%d!", info$width, info$height)
+
+# 열 지도 이미지의 혼합/투명 버전 만들기
+pal <- col2rgb(viridis(20), alpha = TRUE)
+alpha <- floor(seq(0, 255, length = ncol(pal)))
+pal_col <- rgb(t(pal), alpha = alpha, maxColorValue = 255)
+write_heatmap(heatmap, "elephant_overlay.png", width = 14, height = 14, bg = NA, col = pal_col)
+
+# 이미지 포개고 출력
+image_read("elephant_overlay.png") %>%
+  image_resize(geometry, filter = "quadratic") %>%
+  image_composite(image, operator = "blend", compose_args = "20") %>%
+  plot()
+
+# 열 지도를 입혀서 본 이미지는 코끼리 코와 귀 부분에 표시가 돼 있어 알아볼 수 있다!
+# 코와 귀를 가지고 아프리카 코끼리임을 알아보는 것 같다...
+
+# 5.5 요약
+# 합성망은 시각적 분류 문제 공략에 좋다
+# 합성망은 시각적 세계를 모듈 패턴과 계층 구조 학습으로 배운다
+# 합성망이 배우는 표현은 검사하기 쉽다
+# 시각적 데이터 보강을 사용해 과적합 문제를 줄이자
+# 사전 훈련 합성망을 사용해 특징 추출 및 미세 조정을 수행할 수 있어야 한다
+# 필터와 열 지도를 시각화해 보는 것은 재미 있다
